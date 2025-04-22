@@ -16,11 +16,31 @@ public class SceneManager : MonoBehaviour
     private Vector3 newRotation;
     private Vector3 newScale;
 
+    private Vector3 cameraPosition;
+    private Vector3 cameraTarget;
+    private Vector3 cameraUp;
+
+    private float yaw = 0f;   // Rotación izquierda/derecha
+    private float pitch = 0f; // Rotación arriba/abajo
+    private float mouseSensitivity = 2f;
+    private float moveSpeed = 5f;
+
+    private Vector3 puntoFocal = Vector3.zero; // punto a orbitar
+    private float distancia = 5f;
+
+    private float keyboardSensitivity = 60f;
+    private float zoomSpeed = 2f;
+    private float minDist = 2f;
+    private float maxDist = 20f;
+
     void Start()
     {
         newPosition = Vector3.zero;
         newRotation = Vector3.zero;
-        newScale = Vector3.one; 
+        newScale = Vector3.one;
+        cameraPosition = new Vector3(0, 2, 5);
+        cameraTarget = Vector3.zero;
+        cameraUp = Vector3.up;
 
         CreateModel();
         CreateCamera();
@@ -28,6 +48,7 @@ public class SceneManager : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
+        CamaraInput();
         RecalcularMatrices();
     }
 
@@ -65,13 +86,13 @@ public class SceneManager : MonoBehaviour
         colores = new Color[]
         {
             new Color(1,0,1),
+            new Color(0,0,0.7f),
+            new Color(0.7f,1,1),
+            new Color(1,0.7f,0.4f),
             new Color(0,0,1),
             new Color(0,1,1),
             new Color(1,0,1),
-            new Color(0,0,1),
-            new Color(0,1,1),
-            new Color(1,0,1),
-            new Color(0,0,1)
+            new Color(0.5f,1,1)
         };
 
         malla.vertices = vertices;
@@ -103,9 +124,13 @@ public class SceneManager : MonoBehaviour
         //Le decimos al shader que utilice esta matriz de modelado 
         cubo.GetComponent<Renderer>().material.SetMatrix("_ModelMatrix", modelMatrix);
 
-        Vector3 pos = new Vector3(4, 2, 0);
-        Vector3 target = new Vector3(0, 0, 0);
-        Vector3 up = new Vector3(0, 0, 1);
+        //Vector3 pos = new Vector3(4, 2, 0);
+        //Vector3 target = new Vector3(0, 0, 0);
+        //Vector3 up = new Vector3(0, 0, 1);
+
+        Vector3 pos = cameraPosition;
+        Vector3 target = cameraTarget;
+        Vector3 up = cameraUp;
 
         Matrix4x4 viewMatrix = CreateViewMatrix(pos, target, up);
         cubo.GetComponent<Renderer>().material.SetMatrix("_ViewMatrix", viewMatrix);
@@ -214,5 +239,57 @@ public class SceneManager : MonoBehaviour
         finalMatrix *= rotationMatrix;
         finalMatrix *= scaleMatrix;
         return (finalMatrix);
+    }
+
+    private void CamaraInput()
+    {
+        // Movimiento con teclado
+        Vector3 forward = (cameraTarget - cameraPosition).normalized;
+        Vector3 right = Vector3.Cross(forward, cameraUp).normalized;
+
+        Vector3 movement = Vector3.zero;
+
+        if (Input.GetKey(KeyCode.W)) movement += forward;
+        if (Input.GetKey(KeyCode.S)) movement -= forward;
+        if (Input.GetKey(KeyCode.D)) movement += right;
+        if (Input.GetKey(KeyCode.A)) movement -= right;
+        if (Input.GetKey(KeyCode.R)) movement -= cameraUp;
+        if (Input.GetKey(KeyCode.F)) movement += cameraUp;
+
+        puntoFocal += movement * moveSpeed * Time.deltaTime;
+
+        if (Input.GetKey(KeyCode.UpArrow)) pitch -= keyboardSensitivity * Time.deltaTime;
+        if (Input.GetKey(KeyCode.DownArrow)) pitch += keyboardSensitivity * Time.deltaTime;
+        if (Input.GetKey(KeyCode.RightArrow)) yaw += keyboardSensitivity * Time.deltaTime;
+        if (Input.GetKey(KeyCode.LeftArrow)) yaw -= keyboardSensitivity * Time.deltaTime;
+
+        pitch = Mathf.Clamp(pitch, -89f, 89f);
+
+        //zoom
+        float scroll = Input.GetAxis("Mouse ScrollWheel");
+        distancia -= scroll * zoomSpeed;
+        distancia = Mathf.Clamp(distancia, minDist, maxDist);
+
+        //pos de la camara segun angulos
+        Quaternion rot = Quaternion.Euler(pitch, yaw, 0f);
+        Vector3 offset = rot * new Vector3(0, 0, -distancia);
+
+        //cameraPosition += movement * moveSpeed * Time.deltaTime;
+        //cameraTarget += movement * moveSpeed * Time.deltaTime;
+
+        cameraPosition = puntoFocal + offset;
+        cameraTarget = puntoFocal;
+
+        // Rotación con el mouse
+        if (Input.GetMouseButton(1)) // Botón derecho del mouse
+        {
+            float mouseX = Input.GetAxis("Mouse X") * mouseSensitivity;
+            float mouseY = Input.GetAxis("Mouse Y") * mouseSensitivity;
+
+            yaw += mouseX;
+            pitch -= mouseY;
+
+            pitch = Mathf.Clamp(pitch, -89f, 89f);
+        }
     }
 }
